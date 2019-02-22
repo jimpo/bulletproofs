@@ -63,13 +63,10 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         mut left: LinearCombination,
         mut right: LinearCombination,
     ) -> (Variable, Variable, Variable) {
-        let var = self.num_vars;
-        self.num_vars += 1;
-
-        // Create variables for l,r,o
-        let l_var = Variable::MultiplierLeft(var);
-        let r_var = Variable::MultiplierRight(var);
-        let o_var = Variable::MultiplierOutput(var);
+        let (l_var, r_var, o_var) = self.allocate(|_eval| {
+            panic!("allocate does not call assignment function in VerifierCS")
+        })
+            .expect("assignment function never fails");
 
         // Constrain l,r,o:
         left.terms.push((l_var, -Scalar::one()));
@@ -82,7 +79,8 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
 
     fn allocate<F>(&mut self, _: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
+        F: FnOnce(&dyn Fn(&LinearCombination) -> Scalar)
+            -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
         let var = self.num_vars;
         self.num_vars += 1;
@@ -124,7 +122,8 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
 
     fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
+        F: FnOnce(&dyn Fn(&LinearCombination) -> Scalar)
+            -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
         self.verifier.allocate(assign_fn)
     }

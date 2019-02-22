@@ -48,7 +48,8 @@ pub trait ConstraintSystem {
     /// Returns `(left, right, out)` for use in further constraints.
     fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>;
+        F: FnOnce(&dyn Fn(&LinearCombination) -> Scalar)
+            -> Result<(Scalar, Scalar, Scalar), R1CSError>;
 
     /// Enforce the explicit constraint that
     /// ```text

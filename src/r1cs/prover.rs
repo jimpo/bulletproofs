@@ -88,21 +88,16 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         mut left: LinearCombination,
         mut right: LinearCombination,
     ) -> (Variable, Variable, Variable) {
-        // Synthesize the assignments for l,r,o
-        let l = self.eval(&left);
-        let r = self.eval(&right);
-        let o = l * r;
+        let (l_var, r_var, o_var) = self.allocate(|eval| {
+            // Synthesize the assignments for l,r,o
+            let l = eval(&left);
+            let r = eval(&right);
+            let o = l * r;
+            Ok((l, r, o))
+        })
+            .expect("assignment function never fails");
 
-        // Create variables for l,r,o ...
-        let l_var = Variable::MultiplierLeft(self.a_L.len());
-        let r_var = Variable::MultiplierRight(self.a_R.len());
-        let o_var = Variable::MultiplierOutput(self.a_O.len());
-        // ... and assign them
-        self.a_L.push(l);
-        self.a_R.push(r);
-        self.a_O.push(o);
-
-        // Constrain l,r,o:
+       // Constrain l,r,o:
         left.terms.push((l_var, -Scalar::one()));
         right.terms.push((r_var, -Scalar::one()));
         self.constrain(left);
@@ -113,9 +108,15 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
 
     fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
+        F: FnOnce(&dyn Fn(&LinearCombination) -> Scalar)
+            -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
-        let (l, r, o) = assign_fn()?;
+        let (l, r, o) = {
+            // The explicit type hint seems to be necessary to compile.
+            let eval: &dyn for<'c> Fn(&'c LinearCombination) -> Scalar =
+                &(|lc| self.eval(lc));
+            assign_fn(eval)?
+        };
 
         // Create variables for l,r,o ...
         let l_var = Variable::MultiplierLeft(self.a_L.len());
@@ -157,7 +158,8 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
 
     fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
+        F: FnOnce(&dyn Fn(&LinearCombination) -> Scalar)
+            -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
         self.prover.allocate(assign_fn)
     }
