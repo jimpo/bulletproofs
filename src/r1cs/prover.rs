@@ -133,6 +133,7 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
     fn constrain(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
+        assert_eq!(self.eval(&lc), Scalar::zero());
         self.constraints.push(lc);
     }
 
